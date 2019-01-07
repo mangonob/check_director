@@ -11,7 +11,6 @@ class Checker:
     def __init__(self, subchecker=[]):
         self.subchecker = subchecker
         self._checked_result = None
-        self._description = None
         pass
 
     def check(self):
@@ -30,7 +29,9 @@ class Checker:
             if not checker.result():
                 return checker.description()
 
-        return self.custom_description()
+        return str(
+            SuccessHeaderDecorator(self.custom_description()) if self.result() else ErrorHeaderDecorator(self.custom_description())
+        )
 
 class TrueChecker(Checker):
     def check(self):
@@ -41,11 +42,11 @@ class TrueChecker(Checker):
 
 class FalseChecker(Checker):
     def check(self):
-        return ErrorTextDecorator("FAILED!!!")
+        return ErrorTextDecorator("ERROR!!!")
 
 class CommandChecker(Checker):
     def __init__(self, command, subchecker = []):
-        super(CommandOutputChecker, self).__init__(subchecker=subchecker)
+        super(CommandChecker, self).__init__(subchecker=subchecker)
         self.command = command
         self.status_and_output = None
 
@@ -53,38 +54,103 @@ class CommandChecker(Checker):
         return self.status_and_output[0] == 0
 
     def check(self):
-        if not super(CommandOutputChecker, self).check():
+        if not super(CommandChecker, self).check():
             return false
 
         self.status_and_output = commands.getstatusoutput(self.command)
         return self.command_validator()
 
-class CommandInstallChecker(CommandChecker):
-    def __init__(self, command):
-        super(CommandInstallChecker, self).__init__(command="which %s" % command)
+    def custom_description(self):
+        return "%s 命令运行%s!" % (self.command, "成功" if self.result() else "失败")
 
-class NetworkDelayChecker(RangeChecker):
+class CommandInstalledChecker(CommandChecker):
+    def __init__(self, command):
+        super(CommandInstalledChecker, self).__init__(command="which %s" % command)
+        self.original_command = command
+
+    def custom_description(self):
+        if self.result():
+            return "命令 %s 已安装" % self.original_command
+        else:
+            return "命令 %s 未安装" % ErrorTextDecorator(self.original_command)
+
+class CommandResultRangeChecker(CommandChecker):
+    def __init__(self, command, valid_range = (-1, 1000), subchecker = []):
+        super(CommandResultRangeChecker, self).__init__(command=command, subchecker=subchecker)
+        self.command_int_result = 0
+        self.valid_range = valid_range
+
+    def command_validator(self):
+        if not super(CommandResultRangeChecker, self).command_validator():
+            return False
+
+        self.command_int_result = int(self.status_and_output[1])
+
+        return self.valid_range[0] <= self.command_int_result <= self.valid_range[1]
+
+    def custom_description(self):
+        if self.result():
+            return "%s 命令的运行结果为 %i" % (self.command, self.command_int_result)
+        else:
+            return "%s 命令的运行结果为 %s" % (self.command, ErrorTextDecorator(self.command_int_result))
+        
+class MySQLConnectionNumberChecker(CommandResultRangeChecker):
+    def __init__(self, valid_range = (300, float("inf"))):
+        super(MySQLConnectionNumberChecker, self) \
+            .__init__(command="lsof -i -n -P | grep TCP | grep '3306' | wc -l",
+                      valid_range=valid_range,
+                      subchecker=[
+                          CommandChecker(command="which lsof 1>/dev/null || yum install lsof"),
+                      ])
+
+    def custom_description(self):
+        if self.result():
+            return "当前 MySQL 连接数为 %s" % self.command_int_result
+        else:
+            return "当前 MySQL 连接数为 %s" % ErrorTextDecorator(self.command_int_result)
+
+class RedisConnectionNumberChecker(CommandResultRangeChecker):
+    def __init__(self, valid_range = (300, float("inf"))):
+        super(RedisConnectionNumberChecker, self) \
+            .__init__(command="lsof -i -n -P | grep TCP | grep '6379' | wc -l",
+                      valid_range=valid_range,
+                      subchecker=[
+                          CommandChecker(command="which lsof 1>/dev/null || yum install lsof"),
+                      ])
+
+    def custom_description(self):
+        if self.result():
+            return "当前 Redis 连接数为 %s" % self.command_int_result
+        else:
+            return "当前 Redis 连接数为 %s" % ErrorTextDecorator(self.command_int_result)
+
+class NetworkDelayChecker(CommandChecker):
     def __init__(self, domain, count=10, valid_range=(0, 1000)):
-        super(NetworkDelayChecker, self).__init__(valid_range=valid_range)
+        super(NetworkDelayChecker, self).__init__(command="ping %s -c %i | grep time=" % (domain, count))
         self.domain = domain
         self.count = count
         self.valid_range = valid_range
+        self.avg_network_delay = -1.0
 
-    def drive(self):
+    def command_validator(self):
+        if not super(NetworkDelayChecker, self).command_validator():
+            return False
+
         def getTime(content):
             return float(re.sub(r".*time=((\d|\.)*).*", r"\1", content))
 
-        outputs = str.split(commands.getoutput("ping %s -c %i | grep time=" % (self.domain, self.count)), "\n")
-        return [getTime(x) for x in outputs]
+        outputs = str.split(self.status_and_output[1], "\n")
+        times = [getTime(x) for x in outputs]
 
-    def value_to_check(self):
-        times = self.drive()
-        return sum(times) / len(times) if len(times) else 0
+        self.avg_network_delay = sum(times) / len(times) if len(times) > 0 else float("inf")
 
-    def check(self):
-        result = super(NetworkDelayChecker, self).check()
-        self.checked_info[Checker.NETWORK_DELAY_KEY] = self.checked_info[Checker.RANGE_KEY]
-        return result
+        return self.valid_range[0] <= self.avg_network_delay <= self.valid_range[1]
+
+    def custom_description(self):
+        if self.result():
+            return "%i 次 ping %s 的平均网络延迟为 %.2lfms" % (self.count, self.domain, self.avg_network_delay)
+        else:
+            return "%i 次 %s 的平均网络延迟为 %.2lfms" % (self.count, ErrorTextDecorator("ping %s" % self.domain), self.avg_network_delay)
 
 class PathChecker(Checker):
     def __init__(self, path):
@@ -94,8 +160,13 @@ class PathChecker(Checker):
     Checker.PATH_KEY = "path_checked_value"
 
     def check(self):
-        self.checked_info[Checker.PATH_KEY] = self.path
         return os.path.exists(self.path)
+
+    def custom_description(self):
+        if self.result():
+            return "文件 %s 存在" % self.path
+        else:
+            return "文件 %s 不存在" % ErrorTextDecorator(self.path)
 
 class CheckerConfiguration:
     @staticmethod
@@ -112,10 +183,12 @@ class CheckerConfiguration:
         ]
 
         self.domains_to_check = [
-            "baidu.com"
+            # "baidu.com"
         ]
 
         self.command_checkers = [
+            MySQLConnectionNumberChecker(),
+            RedisConnectionNumberChecker(),
         ]
 
 class TextDecorator:
@@ -135,11 +208,11 @@ class SuccessTextDecorator(TextDecorator):
 
 class ErrorHeaderDecorator(TextDecorator):
     def __str__(self):
-        return "%s️\t%s" % (ErrorTextDecorator("异常⚠"), super(ErrorHeaderDecorator, self).__str__())
+        return "%s️\t%s" % (ErrorTextDecorator("ERROR⚠"), super(ErrorHeaderDecorator, self).__str__())
 
 class SuccessHeaderDecorator(TextDecorator):
     def __str__(self):
-        return "%s\t%s" % (SuccessTextDecorator("正常✅"), super(SuccessHeaderDecorator, self).__str__())
+        return "%s\t%s" % (SuccessTextDecorator("SUCCESS✅"), super(SuccessHeaderDecorator, self).__str__())
 
 class CheckerRoutine:
     @staticmethod
@@ -148,17 +221,14 @@ class CheckerRoutine:
 
         for x in configuration.filenames_to_check:
             checker = PathChecker(path=x)
-            if checker.check():
-                print(SuccessHeaderDecorator("文件 %s 存在" % SuccessTextDecorator(x)))
-            else:
-                print(ErrorHeaderDecorator("文件 %s 不存在" % ErrorTextDecorator(x)))
+            print(checker.description())
 
         for x in configuration.domains_to_check:
             checker = NetworkDelayChecker(x)
-            if checker.check():
-                print(SuccessHeaderDecorator("ping %s 的延迟为 %.2lfms" % (x, checker.checked_info[Checker.NETWORK_DELAY_KEY])))
-            else:
-                print(ErrorHeaderDecorator("%s %s 的延迟为 %.2lfms 延迟较大" % (ErrorTextDecorator("ping"), ErrorTextDecorator(x), checker.checked_info[Checker.NETWORK_DELAY_KEY])))
+            print(checker.description())
+
+        for checker in configuration.command_checkers:
+            print(checker.description())
 
 if __name__ == "__main__":
     CheckerRoutine.routine()
