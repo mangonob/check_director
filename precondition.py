@@ -170,6 +170,31 @@ class PathChecker(Checker):
         else:
             return "文件 %s 不存在" % ErrorTextDecorator(self.path)
 
+class XMLChecker(Checker):
+    def __init__(self, path, xpath, attribute_name, validator, subchecker=[]):
+        super(XMLChecker, self).__init__(subchecker=subchecker)
+        self.value = None
+        self.path = path
+        self.xpath = xpath
+        self.attribute_name = attribute_name
+        self.validator = validator
+
+    def check(self):
+        try:
+            from xml.etree import ElementTree
+            root = ElementTree.parse(self.path).getroot()
+            self.value = root.find(self.xpath).attrib[self.attribute_name]
+            return self.validator(self.value)
+        except RuntimeError:
+            exit(1)
+
+    def custom_description(self):
+        if self.result():
+            return "XML文件 %s 的 %s节点的 %s 值为 %s" % (self.path, self.xpath, self.attribute_name, self.value)
+        else:
+            return "XML文件 %s 的 %s节点的 %s 值为 %s" % (ErrorTextDecorator(self.path), ErrorTextDecorator(self.xpath), self.attribute_name, self.value)
+
+
 class CheckerConfiguration:
     @staticmethod
     def shared():
@@ -189,22 +214,14 @@ class CheckerConfiguration:
             "r-uf69fffc722e4134.redis.rds.aliyuncs.com",
         ]
 
+        self.xml_path_xpath_and_validator = [
+            ("/usr/local/tomcat7/conf/server.xml", "Service/Connector[@minSpareThreads]", "minSpareThreads", lambda _: True),
+        ]
+
         self.command_checkers = [
             MySQLConnectionNumberChecker(),
             RedisConnectionNumberChecker(),
         ]
-
-class KeyChecker(Checker):
-    def __init__(self, path, pattern_and_groups, validator):
-        super(KeyChecker, self).__init__()
-        self.path = path
-        self.pattern_and_groups = pattern_and_groups
-
-    def check(self):
-        return true
-
-    def custom_description(self):
-        pass
 
 class TextDecorator:
     def __init__(self, component):
@@ -240,6 +257,10 @@ class CheckerRoutine:
 
         for x in configuration.domains_to_check:
             checker = NetworkDelayChecker(x)
+            print(checker.description())
+
+        for path, xpath, name, validator in configuration.xml_path_xpath_and_validator:
+            checker = XMLChecker(path=path, xpath=xpath, attribute_name=name, validator=validator, subchecker=[PathChecker(path=path)])
             print(checker.description())
 
         for checker in configuration.command_checkers:
