@@ -23,7 +23,7 @@ class CheckDirectorRoutine:
         docker_container_id_names = map(lambda _ : str.split(_, "\t"), docker_container_id_names)
 
         if len(docker_container_id_names):
-            print(SuccessTextDecorator("共查询到 %s 个容器信息，开始执行脚本...\n"))
+            print(SuccessTextDecorator("共查询到 %s 个容器信息，开始执行脚本...\n" % len(docker_container_id_names)))
 
         for container_id, name in docker_container_id_names:
             print(SuccessTextDecorator("开始检查容器 %s(%s)..." % (name, container_id)))
