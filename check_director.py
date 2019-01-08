@@ -27,7 +27,11 @@ class CheckDirectorRoutine:
 
         for container_id, name in docker_container_id_names:
             print(SuccessTextDecorator("开始检查容器 %s(%s)..." % (name, container_id)))
-            status, output = CheckDirectorRoutine.exec_python_script_in_container(container_id, "precondition.py")
+            status, output = CheckDirectorRoutine.exec_python_script_in_container(
+                container_id,
+                "curl -s https://raw.githubusercontent.com/mangonob/check_director/master/precondition.py"
+            )
+
             if status == 0:
                 print(output)
                 print(SuccessTextDecorator("容器 %s(%s) 检查完毕!!!\n" % (name, container_id)))
