@@ -185,13 +185,26 @@ class CheckerConfiguration:
         ]
 
         self.domains_to_check = [
-            # "baidu.com"
+            "rm-uf6w431305i28jha5.mysql.rds.aliyuncs.com",
+            "r-uf69fffc722e4134.redis.rds.aliyuncs.com",
         ]
 
         self.command_checkers = [
             MySQLConnectionNumberChecker(),
             RedisConnectionNumberChecker(),
         ]
+
+class KeyChecker(Checker):
+    def __init__(self, path, pattern_and_groups, validator):
+        super(KeyChecker, self).__init__()
+        self.path = path
+        self.pattern_and_groups = pattern_and_groups
+
+    def check(self):
+        return true
+
+    def custom_description(self):
+        pass
 
 class TextDecorator:
     def __init__(self, component):
