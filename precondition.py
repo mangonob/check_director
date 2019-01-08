@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 #encoding=utf-8
+# Author: 高炼
+# Date: 2019-01-08
 
 __metaclass__ = type
 
@@ -100,7 +102,7 @@ class MySQLConnectionNumberChecker(CommandResultRangeChecker):
             .__init__(command="lsof -i -n -P | grep TCP | grep '3306' | wc -l",
                       valid_range=valid_range,
                       subchecker=[
-                          CommandChecker(command="which lsof 1>/dev/null || yum install lsof"),
+                          CommandChecker(command="which lsof 1>/dev/null || yum install lsof -y"),
                       ])
 
     def custom_description(self):
@@ -115,7 +117,7 @@ class RedisConnectionNumberChecker(CommandResultRangeChecker):
             .__init__(command="lsof -i -n -P | grep TCP | grep '6379' | wc -l",
                       valid_range=valid_range,
                       subchecker=[
-                          CommandChecker(command="which lsof 1>/dev/null || yum install lsof"),
+                          CommandChecker(command="which lsof 1>/dev/null || yum install lsof -y"),
                       ])
 
     def custom_description(self):
