@@ -6,7 +6,29 @@
 __metaclass__ = type
 
 import commands
-from precondition import *
+
+class TextDecorator:
+    def __init__(self, component):
+        self.component = component
+
+    def __str__(self):
+        return str(self.component)
+
+class ErrorTextDecorator(TextDecorator):
+    def __str__(self):
+        return "\033[31m%s\033[0m" % super(ErrorTextDecorator, self).__str__()
+
+class SuccessTextDecorator(TextDecorator):
+    def __str__(self):
+        return "\033[32m%s\033[0m" % super(SuccessTextDecorator, self).__str__()
+
+class ErrorHeaderDecorator(TextDecorator):
+    def __str__(self):
+        return "%s️\t%s" % (ErrorTextDecorator("ERROR⚠"), super(ErrorHeaderDecorator, self).__str__())
+
+class SuccessHeaderDecorator(TextDecorator):
+    def __str__(self):
+        return "%s\t%s" % (SuccessTextDecorator("SUCCESS✅"), super(SuccessHeaderDecorator, self).__str__())
 
 class CheckDirectorRoutine:
     @staticmethod
