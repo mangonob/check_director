@@ -223,7 +223,7 @@ class SuccessTextDecorator(TextDecorator):
 
 class ErrorHeaderDecorator(TextDecorator):
     def __str__(self):
-        return "%s️\t%s" % (ErrorTextDecorator("ERROR⚠"), super(ErrorHeaderDecorator, self).__str__())
+        return "%s\t%s" % (ErrorTextDecorator("ERROR⚠"), super(ErrorHeaderDecorator, self).__str__())
 
 class SuccessHeaderDecorator(TextDecorator):
     def __str__(self):
