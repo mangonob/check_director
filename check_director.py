@@ -37,7 +37,7 @@ class CheckDirectorRoutine:
 
     @staticmethod
     def routine():
-        status_output = commands.getstatusoutput("docker ps 2>/dev/null")
+        status_output = commands.getstatusoutput("docker ps")
         if status_output[0]:
             print(status_output[1])
             exit(1)
