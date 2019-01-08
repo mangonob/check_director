@@ -11,7 +11,7 @@ from precondition import *
 class CheckDirectorRoutine:
     @staticmethod
     def exec_python_script_in_container(container_id, source):
-        return commands.getstatusoutput("docker exec --interactive %s python < %s" % (container_id, source))
+        return commands.getstatusoutput("$s | docker exec --interactive %s python" % (source, container_id))
 
     @staticmethod
     def routine():
