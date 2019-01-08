@@ -37,8 +37,7 @@ class CheckDirectorRoutine:
 
     @staticmethod
     def routine():
-        checker = CommandChecker(command="docker ps 2>/dev/null")
-        if not checker.result():
+        if commands.getstatusoutput("docker ps 2>/dev/null")[0]:
             exit(1)
 
         docker_container_id_names = str.split(commands.getoutput('docker ps --filter "name=hwsc" --format "{{.ID}}\t{{.Names}}"'), "\n")
